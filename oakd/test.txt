@@ -1,0 +1,1 @@
+out center_x: 0
