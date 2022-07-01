@@ -185,15 +185,15 @@ with dai.Device(pipeline) as device:
 
     gps_lat_aver = []  # aver gps position
     gps_long_aver = []  
+    # save video set
+    fourcc=cv2.VideoWriter_fourcc(*'XVID')
+    save_original=cv2.VideoWriter("original video.avi",fourcc,30,(416, 416))
+    save_detection=cv2.VideoWriter("detection video.avi",fourcc,30,(416, 416))
     # nn data, being the bounding box locations, are in <0..1> range - they need to be normalized with frame width/height
     def frameNorm(frame, bbox):
         normVals = np.full(len(bbox), frame.shape[0])
         normVals[::2] = frame.shape[1]
         return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
-    
-    # save video set
-    fourcc=cv2.VideoWriter_fourcc(*'XVID')
-    out=cv2.VideoWriter("GPS_get video.avi",fourcc,30,(416, 416))
         
     def displayFrame(name, frame):
         color = (255, 0, 0)
@@ -201,7 +201,7 @@ with dai.Device(pipeline) as device:
         global long_aver
         global cur_uav_latitude
         global cur_uav_longitude
-        
+        #save_original.write(frame)
         center_x = (detections[0].xmin+detections[0].xmax)/2 if len(detections)>0 else 0
         for detection in detections:
             bbox = frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
@@ -236,7 +236,7 @@ with dai.Device(pipeline) as device:
         # Show the frame
         cv2.imshow(name, frame)
         # save video
-        #out.write(frame)
+        #save_detection.write(frame)
     while True:
         if syncNN:
             inRgb = qRgb.get()
