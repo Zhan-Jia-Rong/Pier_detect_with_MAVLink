@@ -2,6 +2,7 @@
 
 import os, sys, socket, time, select, subprocess, struct
 from pymavlink import mavutil
+#from pymavlink import mavwp
 from pymavlink.dialects.v10 import ardupilotmega as mavlink
 
 cur_uav_latitude = 0
@@ -11,6 +12,9 @@ cur_uav_satellites = 0
 cur_uav_gps_ground_speed = 0
 
 noGCS_flag = 1
+
+cur_wp=0
+#wp = mavwp.MAVWPLoader()
 
 class nothing(object):
     def __init__(self):
@@ -22,6 +26,7 @@ class nothing(object):
 
 def init_mav():
     mav_master = mavutil.mavlink_connection(device="tcp:127.0.0.1:5762", baud=115200, source_system=255)
+    #mav_wp=mavutil.mavfile(None,"tcp:127.0.0.1:5762")
     print ("Waiting for APM heartbeat")
     while True:
         hb = mav_master.recv_match(type='HEARTBEAT', blocking=True)
@@ -38,6 +43,7 @@ def my_main():
     global cur_uav_satellites
     global cur_uav_gps_ground_speed
     global noGCS_flag
+    global cur_wp
 
     compid = 1
 
@@ -48,8 +54,10 @@ def my_main():
 
     while True:
         cur_ts = time.time()
-
+        #print(87)
+        #print(mav_wp.waypoint_current())
         # receive message from UAV
+        #if mav_master.waypoint_current()
         msg = mav_master.recv_msg()
         if msg is not None and msg.get_type() != "BAD_DATA":
             msg_id = msg.get_msgId()
@@ -72,10 +80,11 @@ def my_main():
             #send request_data_stream to uav
             print ("send request_data_stream to UAV [flag : %d]" % (noGCS_flag))
             mav_master.mav.request_data_stream_send(mav_master.target_system, mav_master.target_component, mavutil.mavlink.MAV_DATA_STREAM_ALL, 10 ,1)
+        cur_wp=mav_master.waypoint_current()
+        print(cur_wp)
         #print("lat=", cur_uav_latitude , " long=",cur_uav_longitude)
         #print ('Lat: %.7f ' % gps_lat ,'Long: %.7f ' % gps_long)
-        #with open("gps_get.csv",'a',encoding='utf-8') as f:
-        #    f.write("Lat={},Long={}\n".format(cur_uav_latitude, cur_uav_longitude))
+        #print(mav_modes,"\n")
         continue
 
 if __name__ == "__main__":

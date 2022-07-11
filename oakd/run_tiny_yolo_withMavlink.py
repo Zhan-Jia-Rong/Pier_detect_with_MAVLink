@@ -32,6 +32,7 @@ gps_lat=0
 gps_long=0
 lat_aver = 0
 long_aver=0
+cur_wp=0
 
 class nothing(object):
     def __init__(self):
@@ -62,6 +63,7 @@ def gps_get():
     global cur_uav_satellites
     global cur_uav_gps_ground_speed
     global noGCS_flag
+    global cur_wp
     gps_pos_flag=0
     # receive message from UAV
     while True:
@@ -89,14 +91,17 @@ def gps_get():
             #send request_data_stream to uav
             print ("send request_data_stream to UAV [flag : %d]" % (noGCS_flag))
             mav_master.mav.request_data_stream_send(mav_master.target_system, mav_master.target_component, mavutil.mavlink.MAV_DATA_STREAM_ALL, 10 ,1)
+        cur_wp=mav_master.waypoint_current()
         #print("cuv_lat=", cur_uav_latitude , " cuv_long=",cur_uav_longitude)
         continue
     #return(cur_uav_latitude,cur_uav_longitude)
 
 mav_master, mav_modes = init_mav()
-#-------------------------------------------------set get gps-------------------------------------------------------------------------------------------
 t = threading.Thread(target=gps_get)
 t.start()
+
+#-------------------------------------------------set get gps-------------------------------------------------------------------------------------------
+
 
 # clear file content
 with open("test_gps.csv", 'w+', encoding = 'utf-8') as f:
@@ -201,20 +206,22 @@ with dai.Device(pipeline) as device:
         global long_aver
         global cur_uav_latitude
         global cur_uav_longitude
-        #save_original.write(frame)
+        global cur_wp
+        trust_th=0
+        save_original.write(frame)
         center_x = (detections[0].xmin+detections[0].xmax)/2 if len(detections)>0 else 0
         for detection in detections:
             bbox = frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
             cv2.putText(frame, labelMap[detection.label], (bbox[0] + 10, bbox[1] + 20), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
             cv2.putText(frame, f"{int(detection.confidence * 100)}%", (bbox[0] + 10, bbox[1] + 40), cv2.FONT_HERSHEY_TRIPLEX, 0.5, 255)
-            
+            trust_th=detection.confidence * 100
             #print("lat=", cur_uav_latitude , " long=",cur_uav_longitude)
 
             cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
             center_x_tmp = (detection.xmin+detection.xmax)/2
             if abs(center_x-0.5)>abs(center_x_tmp-0.5):
                 center_x = center_x_tmp
-        if center_x < 0.55 and center_x > 0.45:
+        if center_x < 0.55 and center_x > 0.45 and trust_th>60 and cur_wp==3:
             if cur_uav_latitude!=0 and cur_uav_longitude!=0:   
                 gps_lat_aver.append(cur_uav_latitude)
                 gps_long_aver.append(cur_uav_longitude)
@@ -224,7 +231,7 @@ with dai.Device(pipeline) as device:
                 lat_aver=sum(gps_lat_aver)/len(gps_lat_aver)
                 long_aver=sum(gps_long_aver)/len(gps_long_aver)
             if lat_aver!=0 and long_aver!=0:
-                #print("lat=", lat_aver," _",len(gps_lat_aver), " long=",long_aver," _",len(gps_long_aver))
+                print("lat=", lat_aver," _",len(gps_lat_aver), " long=",long_aver," _",len(gps_long_aver))
                 with open("test_gps.csv", 'a', encoding = 'utf-8') as f:
                     f.write("{},{}\n".format(lat_aver,long_aver))
             gps_lat_aver.clear()
@@ -236,7 +243,7 @@ with dai.Device(pipeline) as device:
         # Show the frame
         cv2.imshow(name, frame)
         # save video
-        #save_detection.write(frame)
+        save_detection.write(frame)
     while True:
         if syncNN:
             inRgb = qRgb.get()
