@@ -64,6 +64,7 @@ def gps_get():
     global cur_uav_gps_ground_speed
     global noGCS_flag
     global cur_wp
+    
     gps_pos_flag=0
     # receive message from UAV
     while True:
@@ -71,30 +72,29 @@ def gps_get():
         msg = mav_master.recv_msg()
         if msg is not None and msg.get_type() != "BAD_DATA":
             msg_id = msg.get_msgId()
-            #print ('(msg_id from UAV:%d)' % (msg_id))
 
-            #if msg.get_type() == "GLOBAL_POSITION_INT":
             if msg_id == 33:
                 cur_uav_altitude = msg.relative_alt/1000.0
-                #print "Relative Altitude=%.7f (M)" % (cur_uav_altitude)
 
-            #if msg.get_type() == "GPS_RAW_INT":
             if msg_id == 24:
                 cur_uav_latitude = msg.lat/10000000.0
                 cur_uav_longitude = msg.lon/10000000.0
                 cur_uav_satellites = msg.satellites_visible
                 cur_uav_gps_ground_speed = msg.vel/100.0
                 gps_pos_flag=1
+                
+            if msg_id == 42:
+                cur_wp=msg.seq
+                
 
         if noGCS_flag == 1:
             noGCS_flag += 1
             #send request_data_stream to uav
             print ("send request_data_stream to UAV [flag : %d]" % (noGCS_flag))
             mav_master.mav.request_data_stream_send(mav_master.target_system, mav_master.target_component, mavutil.mavlink.MAV_DATA_STREAM_ALL, 10 ,1)
-        cur_wp=mav_master.waypoint_current()
+        
         #print("cuv_lat=", cur_uav_latitude , " cuv_long=",cur_uav_longitude)
         continue
-    #return(cur_uav_latitude,cur_uav_longitude)
 
 mav_master, mav_modes = init_mav()
 t = threading.Thread(target=gps_get)
@@ -221,23 +221,26 @@ with dai.Device(pipeline) as device:
             center_x_tmp = (detection.xmin+detection.xmax)/2
             if abs(center_x-0.5)>abs(center_x_tmp-0.5):
                 center_x = center_x_tmp
-        if center_x < 0.55 and center_x > 0.45 and trust_th>60 and cur_wp==3:
-            if cur_uav_latitude!=0 and cur_uav_longitude!=0:   
-                gps_lat_aver.append(cur_uav_latitude)
-                gps_long_aver.append(cur_uav_longitude)
-
-        if (center_x < 0.45 and center_x > 0) or (center_x > 0.55 and center_x < 1) :
-            if len(gps_lat_aver)!=0 and len(gps_long_aver)!=0 :
-                lat_aver=sum(gps_lat_aver)/len(gps_lat_aver)
-                long_aver=sum(gps_long_aver)/len(gps_long_aver)
-            if lat_aver!=0 and long_aver!=0:
-                print("lat=", lat_aver," _",len(gps_lat_aver), " long=",long_aver," _",len(gps_long_aver))
-                with open("test_gps.csv", 'a', encoding = 'utf-8') as f:
-                    f.write("{},{}\n".format(lat_aver,long_aver))
-            gps_lat_aver.clear()
-            gps_long_aver.clear()
-            lat_aver=0
-            long_aver=0
+        #print("lat=", cur_uav_latitude , " long=",cur_uav_longitude)
+        #print(cur_wp)
+        if cur_wp==3:
+            if center_x < 0.55 and center_x > 0.45 and trust_th>30:
+                if cur_uav_latitude!=0 and cur_uav_longitude!=0:   
+                    gps_lat_aver.append(cur_uav_latitude)
+                    gps_long_aver.append(cur_uav_longitude)
+    
+            if (center_x < 0.45 and center_x > 0) or (center_x > 0.55 and center_x < 1) :
+                if len(gps_lat_aver)!=0 and len(gps_long_aver)!=0 :
+                    lat_aver=sum(gps_lat_aver)/len(gps_lat_aver)
+                    long_aver=sum(gps_long_aver)/len(gps_long_aver)
+                if lat_aver!=0 and long_aver!=0:
+                    print("lat=", lat_aver," _",len(gps_lat_aver), " long=",long_aver," _",len(gps_long_aver))
+                    with open("test_gps.csv", 'a', encoding = 'utf-8') as f:
+                        f.write("{},{}\n".format(lat_aver,long_aver))
+                gps_lat_aver.clear()
+                gps_long_aver.clear()
+                lat_aver=0
+                long_aver=0
 
 
         # Show the frame
@@ -266,3 +269,5 @@ with dai.Device(pipeline) as device:
 
         if cv2.waitKey(1) == ord('q'):
             break
+
+            
